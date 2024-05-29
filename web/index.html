@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask-SocketIO WebSocket Example</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        #frame {
+            display: flex;
+            background-color: #222;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(12,20px);
+            grid-template-rows: repeat(21,20px);
+            gap:2px;
+        }
+        .row {
+            display: contents;
+        }
+        .cell {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            color:#aaa;
+        }
+    </style>
+</head>
+<body>
+    <h1>Tetris</h1>
+    <div id="status">waiting another user...</div>
+    
+    <div id="frame">
+        <div id="player" class="board"></div>
+        <div id="opponent" class="board"></div>
+    </div>
+
+
+
+    <script>
+        function display(board, boardData) {
+            board.innerHTML = '';
+            for (let row=3; row<boardData.length; row++) {
+                const div = document.createElement('div');
+                div.classList.add('row')
+                for (let val of boardData[row]) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    if (val == 8) {
+                        cell.innerText = '■';
+                    }
+                    else if (val > 0) {
+                        cell.innerText = '■';
+                        cell.style.color = ['salmon','orange','yellow','palegreen','skyblue','royalblue','orchid'][val-1]
+                    }
+                    else if (val < 0) {
+                        cell.innerText = '□';
+                        cell.style.color = ['salmon','orange','yellow','palegreen','skyblue','royalblue','orchid'][-val-1]
+                    }
+                    else if (val == 0){
+                        cell.innerText = '';
+                    }
+                    div.append(cell);
+                }
+                board.append(div);
+            }
+        }
+
+
+        const socket = io();
+        let sid = null
+
+        socket.on('sid', data => {
+            sid = data
+        })
+
+        socket.on('message', function(data) {
+            // console.log(data);
+            switch (data.event) {
+                case 'connected':
+                    document.querySelector('#status').innerText = data.data;
+                    break;
+                case 'display':
+                    for (let key in data.data) {
+                        let board;
+                        if (key == sid) {
+                            board = document.querySelector('#player');
+                        } else {
+                            board = document.querySelector('#opponent');
+                        }
+                        let boardData = data.data[key].board;
+                        display(board, boardData);
+                    }
+                    break;
+            }
+
+
+            // const li = document.createElement('li');
+            // li.innerText = `${data.event}: ${data.data}`;
+            // document.getElementById('messages').appendChild(li);
+        });
+
+
+        window.addEventListener('keydown', e => {
+            socket.send({event: 'keyboard', data: { key: e.code }})
+        })
+
+    </script>
+</body>
+</html>

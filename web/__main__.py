@@ -1,60 +1,113 @@
-from flask import Flask, render_template, request
-from flask_socketio import SocketIO, join_room, leave_room, emit
+import sys
+sys.path.insert(1, './')
+
+import socketio
+import asyncio
+from aiohttp import web
+
+
+from web.webgame import WebGame
 import os
+base_dir = os.path.abspath(os.path.dirname(__file__))
 
-games = []
 
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app)
+
+# todo
+# 1. 소켓을 이용해 방을 만들기
+# 1-1. 각 유저마다 게임 보드를 할당
+# 2. 준비 버튼을 구현하기
+# 2-1. html에서 'ready' event 트리거 하기
+# 3. 모두가 준비 되면 시작하기
+
+sio = socketio.AsyncServer(async_mode='aiohttp')
+app = web.Application()
+sio.attach(app)
 
 room_counter = 0
 waiting_user = None
 rooms_users = {}
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+routes = web.RouteTableDef()
 
-@socketio.on('connect')
-def handle_connect():
+@routes.get('/')
+async def index(request):
+    return web.FileResponse(os.path.join(base_dir, 'index.html'))
+
+@sio.on('connect')
+async def handle_connect(sid, data):
     global waiting_user, room_counter
+    print('cunnected:', sid)
     if waiting_user:
+        await sio.emit('sid', sid, to=sid)
         room = f'room_{room_counter}'
-        join_room(room, sid=waiting_user)
-        join_room(room)
+        await sio.enter_room(room=room, sid=waiting_user)
+        await sio.enter_room(room=room, sid=sid)
         if room not in rooms_users:
-            rooms_users[room] = []
-            rooms_users[room].append(waiting_user)
-            rooms_users[room].append(request.sid)
-        socketio.emit('message', {'event': 'connected', 'data': 'A new user has joined the room.'}, to=room)
+            rooms_users[room] = {}
+            rooms_users[room][waiting_user] = {'name': 'user1', 'data': WebGame(user='user1', socket=sio, room=room, rooms_users=rooms_users, sid=waiting_user)}
+            rooms_users[room][sid] = {'name': 'user2', 'data': WebGame(user='user2', socket=sio, room=room, rooms_users=rooms_users, sid=sid)}
+        await sio.emit('message', {'event': 'connected', 'data': 'A new user has joined the room.'}, to=room)
+        asyncio.create_task(rooms_users[room][waiting_user]['data'].start())
+        asyncio.create_task(rooms_users[room][sid]['data'].start())
         waiting_user = None
         room_counter += 1
     else:
-        waiting_user = request.sid
+        waiting_user = sid
+        await sio.emit('sid', sid, to=sid)
 
-@socketio.on('disconnect')
-def handle_disconnect():
+@sio.on('disconnect')
+async def handle_disconnect(sid):
     global waiting_user
-    if waiting_user == request.sid:
+    if waiting_user == sid:
         waiting_user = None
+    else:
+        rid = [room for room in sio.rooms(sid) if room != sid][0]
+        if rid:
+            del rooms_users[rid][sid]
+            # 상대방이 나가면 게임이 종료되도록 해야 하나? 일단은 구현이 어렵다.
+            # for key in rooms_users[rid]:
+            #     waiting_user = key
+            #     del rooms_users[rid][key]
+            await sio.emit('message', {'event': 'connected', 'data': rid}, room=rid)
 
-    room = [room for room in socketio.server.rooms(request.sid) if room != request.sid]
-    if room:
-        print(room)
-        emit('message', {'event': 'connected', 'data': room}, room=room[0])
+# 클라이언트로부터 키보드 이벤트를 수신
+@sio.on('message')
+async def handle_message(sid, data):
+    print(data)
+    # 입력된 키
+    key = data['data']['key']
+    if key in WebGame.hotkeys:
+        # 유저가 속한 룸의 이름 추출(유저 본인의 고유 룸 제외)
+        rid = [room for room in sio.rooms(sid) if room != sid][0]
+        if rid:
+            room = rooms_users[rid]
+            user = room[sid]
+            g: WebGame = user['data']
 
-@socketio.on('message')
-def handle_message(data):
-    room = [room for room in socketio.server.rooms(request.sid) if room != request.sid]
-    print(socketio.server.rooms(request.sid), request.sid)
-    if room:
-        # 해당 룸의 데이터를 찾기(테트리스의 game 배열)
-        emit('message', data, room=room[0])
+            flag = False
+            if key == 'ArrowRight':
+                flag = g.move('R')
+            elif key == 'ArrowLeft':
+                flag = g.move('L')
+            elif key == 'ArrowDown':
+                flag = g.move('D')
+            elif key == 'KeyZ':
+                print(1)
+                flag = g.rotate(True)
+            elif key == 'KeyX':
+                flag = g.rotate()
+            elif key == 'KeyC':
+                flag = g.hold()
+            elif key == 'Space':
+                while g.move('D'):
+                    pass
+                g.droped = True
+                asyncio.create_task(g.start())
+                return
+            if flag:
+                await g.display()
 
-
-
-
+app.add_routes(routes)
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=8000, debug=True)
+    web.run_app(app,host='0.0.0.0', port=8000)
 

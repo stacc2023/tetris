@@ -5,9 +5,13 @@ from collections import defaultdict
 import time
 import keyboard
 import asyncio
-from board import Board
-from block import Block, Tetromino
-from cursor import move, get_cursor_position
+import sys
+sys.path.insert(1, './')
+
+
+from game.board import Board
+from game.block import Block, Tetromino
+from game.cursor import move, get_cursor_position
 
 class Game:
     pocket = None
@@ -241,7 +245,17 @@ class Game:
             self.insert()
             return True
                 
-
+    def hold(self):
+        self.b.remove(self.t)
+        if self.b.collision(self.next_t) == False:
+            self.t.row_index = 4 - self.t.h
+            self.t.col_index = self.w // 2
+            self.t, self.next_t = self.next_t, self.t
+            self.insert()
+            return True
+        else:
+            self.b.insert(self.t)
+            return False
 
     async def handle_keyboard_events(self):
         while True:
@@ -262,15 +276,8 @@ class Game:
                 if self.move('D'):
                     self.display()
             elif event.name == 'c': # hold
-                self.b.remove(self.t)
-                if self.b.collision(self.next_t) == False:
-                    self.t.row_index = 4 - self.t.h
-                    self.t.col_index = self.w // 2
-                    self.t, self.next_t = self.next_t, self.t
-                    self.insert()
+                if self.hold():
                     self.display()
-                else:
-                    self.b.insert(self.t)
             elif event.name == 'space': # hard drop
                 while self.move('D'):
                     pass
@@ -292,5 +299,6 @@ async def main():
     
     await game_task
     await keyboard_task
-
-asyncio.run(main())
+    
+if __name__ == '__main__':
+    asyncio.run(main())

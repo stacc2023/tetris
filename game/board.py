@@ -6,7 +6,7 @@ import time
 import keyboard
 import asyncio
 
-from block import Block
+from game.block import Block
 
 class Board:
     prev_t = None
