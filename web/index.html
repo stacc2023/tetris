@@ -6,42 +6,86 @@
     <title>Flask-SocketIO WebSocket Example</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
+        body {
+            color: #222;
+        }
+
         #frame {
             display: flex;
             background-color: #222;
         }
         .board {
             display: grid;
-            grid-template-columns: repeat(12,20px);
-            grid-template-rows: repeat(21,20px);
+            grid-template-columns: repeat(12,12px);
+            grid-template-rows: repeat(21,12px);
             gap:2px;
         }
         .row {
             display: contents;
         }
         .cell {
-            width: 20px;
-            height: 20px;
+            width: 12px;
+            height: 12px;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 20px;
+            font-size: 12px;
             color:#aaa;
         }
     </style>
 </head>
 <body>
     <h1>Tetris</h1>
-    <div id="status">waiting another user...</div>
+    <div id="status"><button onclick="matching()">match</button></div>
     
     <div id="frame">
         <div id="player" class="board"></div>
         <div id="opponent" class="board"></div>
     </div>
 
-
-
     <script>
+        const status = document.querySelector('#status');
+        function matching(e) {
+
+            console.log(1);
+
+            const socket = io();
+            let sid = null
+
+            socket.on('sid', data => {
+                sid = data
+            });
+
+            socket.on('message', function(data) {
+                // console.log(data);
+                switch (data.event) {
+                    case 'connected':
+                        document.querySelector('#status').innerText = data.data;
+                        break;
+                    case 'display':
+                        for (let key in data.data) {
+                            let board;
+                            if (key == sid) {
+                                board = document.querySelector('#player');
+                            } else {
+                                board = document.querySelector('#opponent');
+                            }
+                            let boardData = data.data[key].board;
+                            display(board, boardData);
+                        }
+                        break;
+                }
+            });
+
+
+            window.addEventListener('keydown', e => {
+                socket.send({event: 'keyboard', data: { key: e.code }})
+            });
+
+
+            status.innerHTML = 'waiting another user...'
+        }
+
         function display(board, boardData) {
             board.innerHTML = '';
             for (let row=3; row<boardData.length; row++) {
@@ -69,45 +113,6 @@
                 board.append(div);
             }
         }
-
-
-        const socket = io();
-        let sid = null
-
-        socket.on('sid', data => {
-            sid = data
-        })
-
-        socket.on('message', function(data) {
-            // console.log(data);
-            switch (data.event) {
-                case 'connected':
-                    document.querySelector('#status').innerText = data.data;
-                    break;
-                case 'display':
-                    for (let key in data.data) {
-                        let board;
-                        if (key == sid) {
-                            board = document.querySelector('#player');
-                        } else {
-                            board = document.querySelector('#opponent');
-                        }
-                        let boardData = data.data[key].board;
-                        display(board, boardData);
-                    }
-                    break;
-            }
-
-
-            // const li = document.createElement('li');
-            // li.innerText = `${data.event}: ${data.data}`;
-            // document.getElementById('messages').appendChild(li);
-        });
-
-
-        window.addEventListener('keydown', e => {
-            socket.send({event: 'keyboard', data: { key: e.code }})
-        })
 
     </script>
 </body>

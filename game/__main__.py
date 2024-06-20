@@ -16,12 +16,13 @@ from game.cursor import move, get_cursor_position
 class Game:
     pocket = None
     t = None
-    next_t = None
+    _next_t = None
+    hold_t = None
     s = None
     b = None
     prev_b = None
-    
     droped = False
+    stop = False
 
     def __init__(self, w=10, h=20):
         self.w = w
@@ -64,14 +65,13 @@ class Game:
         self.prev_b = Board(self.b.w, self.b.h)
         self.prev_b.b = self.b.b.copy()
         
-
         move(30, 0)
         print('NEXT', end='', flush=True)
         for i in range(4):
             move(30, i+1)
             for j in range(4):
-                if i <= self.next_t.h and j <= self.next_t.w:
-                    val = self.next_t.b[i-1][j-1]
+                if i < self.next_t.h and j < self.next_t.w:
+                    val = self.next_t.b[i][j]
                     if val:
                         print(f'\033[9{val-1}m■\033[0m', end=' ', flush=True)
                     else:
@@ -79,51 +79,60 @@ class Game:
                 else:
                     print(' ', end=' ', flush=True)
             print(flush=True)
+        
+        if self.hold_t:
+            move(37, 0)
+            print('HOLD', end='', flush=True)
+            for i in range(4):
+                move(37, i+1)
+                for j in range(4):
+                    if i < self.hold_t.h and j < self.hold_t.w:
+                        val = self.hold_t.b[i][j]
+                        if val:
+                            print(f'\033[9{val-1}m■\033[0m', end=' ', flush=True)
+                        else:
+                            print(' ', end=' ', flush=True)
+                    else:
+                        print(' ', end=' ', flush=True)
+                print(flush=True)
 
     def make_pocket(self):
         indices = np.random.choice(np.arange(0,7), 7, False)
         types = np.vectorize(lambda i: Tetromino.types[i])(indices)
         pocket = []
         for type in types:
-            b = Block(type)
-            b.row_index = 4 - b.h
-            b.col_index = self.w // 2
+            b = Block(type, board_h = self.h, board_w = self.w)
             pocket.append(b)
         return pocket
 
+    # get next block in pocket.
+    @property
+    def next_t(self):
+        if self._next_t:
+            return self._next_t
+        else:
+            if len(self.pocket):
+                self._next_t = self.pocket.pop()
+            else:
+                self.pocket = self.next_pocket
+                self.next_pocket = self.make_pocket()
+                self._next_t = self.pocket.pop()
+            return self._next_t
+        
+    @next_t.setter
+    def next_t(self, value):
+        self._next_t = value
+    
+    # get new block.
     def make_block(self):
 
-        # 다음 블럭이 저장되어 있다면 그것을 사용
-        if self.next_t:
-            self.t = self.next_t
-            if len(self.pocket):
-                self.next_t = self.pocket.pop()
-            else:
-                self.pocket = self.next_pocket
-                self.next_pocket = self.make_pocket()
-                self.next_t = self.pocket.pop()
-        # 다음 블럭이 없다면 새로 할당
-        else:
-            if len(self.pocket) > 1:
-                self.t = self.pocket.pop()
-                self.next_t = self.pocket.pop()
-            elif len(self.pocket) == 1:
-                self.t = self.pocket.pop()
-                self.pocket = self.next_pocket
-                self.next_pocket = self.make_pocket()
-                self.next_t = self.pocket.pop()
-            else:
-                self.pocket, self.next_pocket = self.next_pocket, self.make_pocket()
-                self.t, self.next_t = self.pocket.pop(), self.pocket.pop()
+        t = self.next_t
+        self.next_t = None
 
-        # 블럭과 그림자 블럭을 초기화
-        t = self.t
+        s = Block()
+        s.copy(t)
+        s.b = -t.b
 
-        s = Block(t.type, shadow=True)
-        s.row_index = 4 - t.h
-        s.col_index = self.w // 2
-
-        s.row_index += 1
         while self.b.collision(s) == False:
             s.row_index += 1
         s.row_index -= 1
@@ -138,6 +147,7 @@ class Game:
         else:
             return False
 
+    #start in local prompt
     async def start(self):
         # 블럭 줄 없애기
         self.b.clear()
@@ -149,7 +159,9 @@ class Game:
             self.display()
             return
         self.display()
-        while True:        
+        while True:
+            while self.stop:
+                await asyncio.sleep(0.5)
             await asyncio.sleep(0.2)
             if self.droped:
                 self.droped = False
@@ -159,6 +171,7 @@ class Game:
                 break
             self.display()
 
+    # move block
     def move(self, d):
         self.b.remove(self.t)
 
@@ -194,21 +207,22 @@ class Game:
                 self.insert()
         return True
     
+    # when block is moved, mode shadow
     def move_shadow(self):
         self.b.remove(self.s)
-        self.s.type = self.t.type
-        self.s.col_index = self.t.col_index
+        self.s.copy(self.t)
         self.s.b = -self.t.b
-        self.s.row_index = self.t.row_index + 1
         while self.b.collision(self.s) == False:
             self.s.row_index += 1
         self.s.row_index -= 1
         self.b.insert(self.s)
 
+    # insert block( use this method after collision check )
     def insert(self):
         self.move_shadow()
         self.b.insert(self.t)
 
+    # rotate block
     def rotate(self, reverse=False):
         self.b.remove(self.t)
         self.t.rotate(-90 if reverse else 90)
@@ -244,19 +258,26 @@ class Game:
         else:
             self.insert()
             return True
-                
+
+    # hold current block, and set next block as current block.
     def hold(self):
         self.b.remove(self.t)
-        if self.b.collision(self.next_t) == False:
-            self.t.row_index = 4 - self.t.h
-            self.t.col_index = self.w // 2
-            self.t, self.next_t = self.next_t, self.t
+        if self.hold_t and self.b.collision(self.hold_t) == False:
+            self.t.reset()
+            self.t, self.hold_t = self.hold_t, self.t
+            self.insert()
+            return True
+        elif self.b.collision(self.next_t) == False:
+            self.t.reset()
+            self.t, self.hold_t = self.next_t, self.t
+            self.next_t = None
             self.insert()
             return True
         else:
             self.b.insert(self.t)
             return False
 
+    # get keyboard event in local prompt
     async def handle_keyboard_events(self):
         while True:
             event = await asyncio.to_thread(keyboard.read_event)
@@ -290,6 +311,8 @@ class Game:
             elif event.name == 'x': # rotation
                 if self.rotate():
                     self.display()
+            elif event.name == 'enter':
+                self.stop = False if self.stop else True
 
 async def main():
     g = Game()

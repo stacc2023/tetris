@@ -29,7 +29,10 @@ class Board:
             self.b = np.insert(self.b, 0, [8] + [0] * self.w + [8], axis=0)
 
     def collision(self, t: Block):
-        area = self.b[t.row_index:t.row_index + t.h, t.col_index:t.col_index + t.w]
+        y = 0 if t.row_index < 0 else t.row_index
+        x = 0 if t.col_index < 0 else t.col_index
+
+        area = self.b[y:y + t.h, x:x + t.w]
         block = t.b[:area.shape[0], :area.shape[1]]
         if (((area > 0) & (block != 0)) != 0).sum():
             return True
@@ -47,5 +50,3 @@ class Board:
         block = t.b[:area.shape[0], :area.shape[1]]
         condition = (area == 0) | ((area < 0) & (block > 0))
         area[condition] = block[condition]
-        # print(area, area <= 0)
-        # self.b[t.row_index:t.row_index + t.h, t.col_index:t.col_index + t.w] = block
