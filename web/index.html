@@ -7,18 +7,36 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         body {
-            color: #222;
+            background-color: #222;
+            color: #ddd;
+            font-family: 'IBM Plex Mono';
+            user-select: none;
         }
 
         #frame {
             display: flex;
+            justify-content: space-around;
+
             background-color: #222;
+        }
+        .frame {
+            display: flex;
+            gap: 10px;
         }
         .board {
             display: grid;
             grid-template-columns: repeat(12,12px);
             grid-template-rows: repeat(21,12px);
             gap:2px;
+        }
+        .blockFrame {
+            width: 50px;
+        }
+        .block {
+            display: grid;
+            grid-template-columns: repeat(4,12px);
+            grid-template-rows: repeat(4,12px);
+            height: 50px;
         }
         .row {
             display: contents;
@@ -31,16 +49,27 @@
             align-items: center;
             font-size: 12px;
             color:#aaa;
+            
+        }
+        button {
+            border: 2px solid #ddd;
         }
     </style>
 </head>
 <body>
-    <h1>Tetris</h1>
-    <div id="status"><button onclick="matching()">match</button></div>
+    <h1 style="color:#ddd; text-align: center;">Tetris</h1>
+    <div style="text-align:center;">left: ←, right: →, drop: ↓, hard-drop: space, rotate: z & x, hold: c</div>
+    <div id="status" style="text-align:center;"><button onclick="matching()">match</button></div>
     
     <div id="frame">
-        <div id="player" class="board"></div>
-        <div id="opponent" class="board"></div>
+        <div>
+            <h1 style="text-align:center;">player</h1>
+            <div id="player" class="frame"></div>
+        </div>
+        <div>
+            <h1 style="text-align:center;">opponent</h1>
+            <div id="opponent" class="frame"></div>
+        </div>
     </div>
 
     <script>
@@ -71,7 +100,10 @@
                                 board = document.querySelector('#opponent');
                             }
                             let boardData = data.data[key].board;
-                            display(board, boardData);
+                            let nextBlock = data.data[key].next_block;
+                            let holdBlock = data.data[key].hold_block;
+                            let scoreData = data.data[key].score
+                            display(board, boardData, nextBlock, holdBlock, scoreData);
                         }
                         break;
                 }
@@ -86,8 +118,41 @@
             status.innerHTML = 'waiting another user...'
         }
 
-        function display(board, boardData) {
-            board.innerHTML = '';
+        function display(frame, boardData, nextData, holdData, scoreData) {
+            frame.innerHTML = '';
+            
+            const board = document.createElement('div');
+            board.classList.add('board');
+
+            const nextFrame = document.createElement('div');
+            nextFrame.classList.add('blockFrame');
+
+            const scoreText = document.createElement('div');
+            scoreText.textContent = 'SCORE';
+
+            const score = document.createElement('div');
+            score.innerText = scoreData;
+
+            const nextText = document.createElement('div');
+            nextText.style.marginTop = '12px';
+            nextText.textContent = 'NEXT';
+
+            const next = document.createElement('div');
+            next.classList.add('block');
+
+            const holdText = document.createElement('div');
+            holdText.textContent = 'HOLD';
+            holdText.style.marginTop = '12px';
+            
+            const hold = document.createElement('div');
+            hold.classList.add('block');
+
+            nextFrame.append(scoreText, score, nextText, next, holdText, hold);
+
+
+            frame.append(board, nextFrame);
+
+            // board            
             for (let row=3; row<boardData.length; row++) {
                 const div = document.createElement('div');
                 div.classList.add('row')
@@ -111,6 +176,65 @@
                     div.append(cell);
                 }
                 board.append(div);
+            }
+
+            // next
+            next.style.gridTemplateColumns = 'repeat(' + nextData.length + ',12px)';
+            next.style.gridTemplateRows = 'repeat(' + nextData.length + ',12px)';
+            for (let row=0; row<nextData.length; row++) {
+                const div = document.createElement('div');
+                div.classList.add('row')
+                for (let val of nextData[row]) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+
+                    if (val == 8) {
+                        cell.innerText = '■';
+                    }
+                    else if (val > 0) {
+                        cell.innerText = '■';
+                        cell.style.color = ['salmon','orange','yellow','palegreen','skyblue','royalblue','orchid'][val-1]
+                    }
+                    else if (val < 0) {
+                        cell.innerText = '□';
+                        cell.style.color = ['salmon','orange','yellow','palegreen','skyblue','royalblue','orchid'][-val-1]
+                    }
+                    else if (val == 0){
+                        cell.innerText = '';
+                    }
+                    div.append(cell);
+                }
+                next.append(div);
+            }
+
+            if (holdData) {
+                hold.style.gridTemplateColumns = 'repeat(' + holdData.length + ',12px)';
+                hold.style.gridTemplateRows = 'repeat(' + holdData.length + ',12px)';
+                for (let row=0; row<holdData.length; row++) {
+                    const div = document.createElement('div');
+                    div.classList.add('row')
+                    for (let val of holdData[row]) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+
+                        if (val == 8) {
+                            cell.innerText = '■';
+                        }
+                        else if (val > 0) {
+                            cell.innerText = '■';
+                            cell.style.color = ['salmon','orange','yellow','palegreen','skyblue','royalblue','orchid'][val-1]
+                        }
+                        else if (val < 0) {
+                            cell.innerText = '□';
+                            cell.style.color = ['salmon','orange','yellow','palegreen','skyblue','royalblue','orchid'][-val-1]
+                        }
+                        else if (val == 0){
+                            cell.innerText = '';
+                        }
+                        div.append(cell);
+                    }
+                    hold.append(div);
+                }
             }
         }
 

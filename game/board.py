@@ -27,6 +27,7 @@ class Board:
                 cnt += 1
         for _ in range(cnt):
             self.b = np.insert(self.b, 0, [8] + [0] * self.w + [8], axis=0)
+        return cnt
 
     def collision(self, t: Block):
         y = 0 if t.row_index < 0 else t.row_index

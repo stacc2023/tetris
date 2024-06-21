@@ -35,44 +35,11 @@
 
 규칙은 다음과 같습니다.
 
-1. 블럭(Tetrimino)의 종류는 7가지
-
-<div style="display:grid;grid-template-columns: repeat(25,10px);grid-template-rows: repeat(4,10px);gap: 4px;">
-<div style="width:10px;height:10px;background:#FFA500;grid-column: 1; grid-row: 1;"></div>
-<div style="width:10px;height:10px;background:#FFA500;grid-column: 1; grid-row: 2;"></div>
-<div style="width:10px;height:10px;background:#FFA500;grid-column: 1; grid-row: 3;"></div>
-<div style="width:10px;height:10px;background:#FFA500;grid-column: 1; grid-row: 4;"></div>
-<div style="width:10px;height:10px;background:#00FFFF;grid-column: 4; grid-row: 2;"></div>
-<div style="width:10px;height:10px;background:#00FFFF;grid-column: 4; grid-row: 3;"></div>
-<div style="width:10px;height:10px;background:#00FFFF;grid-column: 4; grid-row: 4;"></div>
-<div style="width:10px;height:10px;background:#00FFFF;grid-column: 3; grid-row: 4;"></div>
-<div style="width:10px;height:10px;background:#FFFF00;grid-column: 6; grid-row: 2;"></div>
-<div style="width:10px;height:10px;background:#FFFF00;grid-column: 6; grid-row: 3;"></div>
-<div style="width:10px;height:10px;background:#FFFF00;grid-column: 6; grid-row: 4;"></div>
-<div style="width:10px;height:10px;background:#FFFF00;grid-column: 7; grid-row: 4;"></div>
-<div style="width:10px;height:10px;background:#008000;grid-column: 9; grid-row: 3;"></div>
-<div style="width:10px;height:10px;background:#008000;grid-column: 10; grid-row: 3;"></div>
-<div style="width:10px;height:10px;background:#008000;grid-column: 9; grid-row: 4;"></div>
-<div style="width:10px;height:10px;background:#008000;grid-column: 10; grid-row: 4;"></div>
-<div style="width:10px;height:10px;background:#800080;grid-column: 13; grid-row: 3;"></div>
-<div style="width:10px;height:10px;background:#800080;grid-column: 14; grid-row: 3;"></div>
-<div style="width:10px;height:10px;background:#800080;grid-column: 12; grid-row: 4;"></div>
-<div style="width:10px;height:10px;background:#800080;grid-column: 13; grid-row: 4;"></div>
-<div style="width:10px;height:10px;background:#F08080;grid-column: 16; grid-row: 3;"></div>
-<div style="width:10px;height:10px;background:#F08080;grid-column: 17; grid-row: 3;"></div>
-<div style="width:10px;height:10px;background:#F08080;grid-column: 17; grid-row: 4;"></div>
-<div style="width:10px;height:10px;background:#F08080;grid-column: 18; grid-row: 4;"></div>
-<div style="width:10px;height:10px;background:#87CEEB;grid-column: 21; grid-row: 3;"></div>
-<div style="width:10px;height:10px;background:#87CEEB;grid-column: 20; grid-row: 4;"></div>
-<div style="width:10px;height:10px;background:#87CEEB;grid-column: 21; grid-row: 4;"></div>
-<div style="width:10px;height:10px;background:#87CEEB;grid-column: 22; grid-row: 4;"></div>
-</div>
-
-I블럭 / J블럭 / L블럭 / O블럭 / S블럭 / Z블럭 / T블럭
+1. 블럭(Tetrimino)의 종류는 7가지: I블럭 / J블럭 / L블럭 / O블럭 / S블럭 / Z블럭 / T블럭
 
 2. 보드의 크기는 세로 20칸, 가로 10칸
 
-3. 무작위 종류의 블럭이 하나 생성 된 후 바닥에 닿기까지 일정한 속도로 한칸식 떨어집니다.
+3. 무작위 종류의 블럭이 하나 생성 된 후 바닥에 닿기까지 일정한 속도로 한 칸 씩 떨어집니다.
 
 4. 떨어지는 도중의 블럭은 왼쪽, 오른쪽, 아래 방향으로 움직일 수 있으며
 시계 또는 반시계 방향으로 회전할 수 있습니다.
@@ -252,9 +219,7 @@ collision, remove, insert 메소드는 블럭이 이동할 때 다음과 같이 
 3. 충돌한다면, 이동하지 않고 기존 위치에 블럭을 insert
 4. 충돌하지 않는다면, 이동한 위치에 블럭을 insert
 
-사실 insert, remove를 매 프레임마다 하지 않고 collision 체크 이후 block의 position 변환만 하는게 더 효율적입니다. 그러나 위와 같은 과정을 거치는 이유는 display 함수의 비용이 배열 연산에 비해 매우 크기 때문입니다.
-
-이에 대해선 후술하겠습니다.
+한편 insert, remove를 매 프레임마다 하지 않고, collision 체크만 하는 것이 더 효율적일 수 있습니다. 그러나 위와 같이 매 프레임마다 블럭을 board 배열에 삽입하는 과정을 거치는 이유는, display 함수의 비용이 배열 연산에 비해 매우 크기 때문입니다. 매 프레임마다 board 배열에서 변한 부분만 출력하는 방식으로 출력의  비용을 최소화 할 수 있습니다.
 
 다음은 collision 메소드입니다.
 ```python
@@ -367,7 +332,7 @@ if __name__ == '__main__':
 ```
 
 위에서도 언급했듯이, display 메소드는 매 프레임마다 board의 배열을 확인하여 바뀐 부분만 다시 출력 해 줍니다.
-그런데 print 함수는 제가 사용중인 python 버전에서 커서 이동이 자유롭지 않기 때문에, 그것을 용이하게 하는 코드를 game/cursor.py로 분리하였습니다. ```move(30,0)```는 prompt 상에서 커서를 이동하는 함수입니다.
+그런데 print 함수는 제가 사용중인 python 버전에서 커서 이동이 자유롭지 않기 때문에, 그것을 용이하게 하는 코드를 game/cursor.py로 분리하였습니다. 위 코드의 ```move(30,0)```가 커서를 이동시키는 함수입니다.
 
 ### pocket
 
@@ -398,7 +363,7 @@ def next_t(self, value):
     self._next_t = value
 ```
 
-위 코드에서 next_t는 포켓에서 다음 블럭을 가져오는 메소드입니다. 포켓의 개수가 유한하기 때문에 next_t의 존재성이 보장되지 않습니다. 따라서 getter를 이용하여 포켓이 다 소모되었다면 새로운 포켓을 만들어줍니다. 이미 next_t가 존재한다면 값이 바뀌지 않기 때문에 None을 할당하여 값을 갱신해줄 수 있도록 하기 위해서 setter도 만들었습니다.
+위 코드에서 next_t는 포켓에서 다음 블럭을 가져오는 메소드입니다. 포켓의 개수가 유한하기 때문에 next_t의 존재성이 보장되지 않습니다. 이 때 getter를 이용한다면, 매번 포켓의 존재를 직접 확인할 필요 없이, 포켓이 다 소모된 경우 새로운 포켓을 만들어주도록 하여 코드의 일관성을 유지할 수 있습니다. 값을 갱신해줄 수 있도록 하기 위해서 setter도 만들었습니다.
 
 ### 동작 관련 메소드
 make_block, move, move_shadow, insert, rotate, hold 등은 블럭의 동작과 관련된 코드입니다.
@@ -447,7 +412,7 @@ else:
     return True
 ```
 
-rotate 메소드의 특이사항은 더 나은 조작감을 위해서, 단순히 충돌이 발생하였다 해서 회전을 취소하지 않고, 벽을 밀어서라도 회전되도록 했다는 점입니다.
+rotate 메소드의 특이사항은 더 나은 조작감을 위해, 회전 시 충돌이 발생하였다 해도 벽을 밀어서라도 회전이 되도록 했다는 점입니다.
 
 ![rotate](img/rotate.webp)
 
@@ -460,8 +425,6 @@ rotate 메소드의 특이사항은 더 나은 조작감을 위해서, 단순히
 마지막으로, local tetris에서 가장 핵심이 되는 것은 async 메소드인 start와 handle_keyboard_events 함수입니다.
 
 python의 스크립트는 동기적으로 실행되기 때문에, 블럭이 일정 주기로 떨어지는 동작과 사용자의 키보드 입력에 따른 동작을 따로따로 구현하기가 어렵습니다.
-
-async 문법은 코드를 비동기적으로 실행하여 이 문제를 해결해줍니다. 다시말해, 블럭이 일정 주기로 떨어지는 동안에도 동시에 키보드 입력을 처리할 수 있게 해줍니다.
 
 ```python
 async def start(self):
@@ -490,7 +453,7 @@ async def start(self):
         self.display()
 ```
 
-동기적으로 코드를 설계하려면, 저 루프문 안에 키보드 입력을 받아오는 메소드를 넣어야 합니다. 그러나 그렇게 하면 키보드 입력 전 까지는 블럭이 떨어지지 않습니다. 저 함수가 async 함수이기 때문에, 키보드 입력을 감지하는 함수를 다른 스레드로 분리할 수 있는 것입니다.
+동기적으로 코드를 설계하려면, 위 코드에서 while 루트 안에 키보드 입력을 받아오는 함수를 넣어야 합니다. 그러나 그렇게 하면 사용자가 키보드를 입력하기 전 까지는 블럭이 정지합니다. async 함수를 이용하여, 키보드 입력을 감지하는 함수를 다른 스레드로 분리할 수 있습니다.
 
 
 ```python
@@ -541,7 +504,7 @@ async def handle_keyboard_events(self):
             self.stop = False if self.stop else True
 ```
 
-여기서 강한 드랍이란 다음의 동작입니다.
+위 코드에서 강한 드랍이란 다음의 동작입니다.
 
 ![harddrop](img/harddrop.webp)
 
@@ -577,4 +540,6 @@ class WebGame(Game):
 ```cmd
 $ python web
 ```
+
+![online](img/online.webp)
 
