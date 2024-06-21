@@ -11,14 +11,6 @@ import os
 base_dir = os.path.abspath(os.path.dirname(__file__))
 
 
-
-# todo
-# 1. 소켓을 이용해 방을 만들기
-# 1-1. 각 유저마다 게임 보드를 할당
-# 2. 준비 버튼을 구현하기
-# 2-1. html에서 'ready' event 트리거 하기
-# 3. 모두가 준비 되면 시작하기
-
 sio = socketio.AsyncServer(async_mode='aiohttp')
 app = web.Application()
 sio.attach(app)
@@ -64,16 +56,11 @@ async def handle_disconnect(sid):
         rid = [room for room in sio.rooms(sid) if room != sid][0]
         if rid:
             del rooms_users[rid][sid]
-            # 상대방이 나가면 게임이 종료되도록 해야 하나? 일단은 구현이 어렵다.
-            # for key in rooms_users[rid]:
-            #     waiting_user = key
-            #     del rooms_users[rid][key]
             await sio.emit('message', {'event': 'connected', 'data': rid}, room=rid)
 
 # 클라이언트로부터 키보드 이벤트를 수신
 @sio.on('message')
 async def handle_message(sid, data):
-    print(data)
     # 입력된 키
     key = data['data']['key']
     if key in WebGame.hotkeys:
@@ -83,6 +70,8 @@ async def handle_message(sid, data):
             room = rooms_users[rid]
             user = room[sid]
             g: WebGame = user['data']
+            if g.gameover:
+                return
 
             flag = False
             if key == 'ArrowRight':

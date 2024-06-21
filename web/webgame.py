@@ -50,6 +50,7 @@ class WebGame(Game):
         if self.make_block() == False:
             # game over
             self.b.b[self.b.b > 0] = 8
+            self.gameover = True
             # display
             await self.display()
             return

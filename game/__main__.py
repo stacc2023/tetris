@@ -14,6 +14,7 @@ from game.block import Block, Tetromino
 from game.cursor import move, get_cursor_position
 
 class Game:
+    gameover = False
     pocket = None
     t = None
     _next_t = None
@@ -157,6 +158,7 @@ class Game:
             # game over
             self.b.b[self.b.b > 0] = 8
             self.display()
+            self.gameover = True
             return
         self.display()
         while True:
@@ -279,7 +281,7 @@ class Game:
 
     # get keyboard event in local prompt
     async def handle_keyboard_events(self):
-        while True:
+        while self.gameover == False:
             event = await asyncio.to_thread(keyboard.read_event)
             # print("Keyboard event:", event)
             if event.event_type == 'up':

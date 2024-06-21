@@ -4,14 +4,20 @@
 1. [Introduction](#Introduction)
 2. [Features](#features)
 3. [Description of local tetris](#description-of-local-tetris)
-    1. [폴더 구조와 실행 방법](#폴더-구조와-실행-방법)
-    2. [전반적인 코드 구조](#전반적인-코드-구조)
+    1. [폴더 구조](#폴더-구조)
+    2. [코드 구조](#코드-구조)
     3. [block.py](#blockpy)
     4. [board.py](#boardpy)
     5. [main.py](#mainpy)
     6. [pockey](#pocket)
     7. [async](#async)
 4. [Description of online tetris](#description-of-online-tetris)
+    1. [웹 폴더 구조](#웹-폴더-구조)
+    2. [main.py](#mainpy-1)
+    3. [webgame.py](#webgamepy)
+    4. [index.html](#indexhtml)
+5. [Future Improvements](#future-improvements)
+6. [Conclusion](#conclusion)
 
 
 
@@ -61,7 +67,7 @@
 
 ## Description of local tetris
 
-### 폴더 구조와 실행 방법
+### 폴더 구조
 
 폴더의 구조는 다음과 같습니다.
 
@@ -88,9 +94,9 @@ game 폴더는 테트리스 관련 데이터가 저장된 파일입니다.
 $ python game
 ```
 
-![cmdtetris](img/cmdtetris.webp)
+![cmdtetris](img/cmdtetris.gif)
 
-### 전반적인 코드 구조
+### 코드 구조
 
 실행 파일의 구조는 다음과 같습니다.
 
@@ -210,7 +216,7 @@ class Board:
 
 clear 메소드는 블럭으로 한 줄이 채워졌는지를 확인 후 지워줍니다.
 
-![clear](img/clear.webp)
+![clear](img/clear.gif)
 
 collision, remove, insert 메소드는 블럭이 이동할 때 다음과 같이 작동합니다.
 
@@ -414,7 +420,7 @@ else:
 
 rotate 메소드의 특이사항은 더 나은 조작감을 위해, 회전 시 충돌이 발생하였다 해도 벽을 밀어서라도 회전이 되도록 했다는 점입니다.
 
-![rotate](img/rotate.webp)
+![rotate](img/rotate.gif)
 
 원래 노란 블럭은 벽에 닿아 있으면 회전할 수 없어야 하지만, 왼쪽 벽과 오른쪽 벽을 각각 한칸씩 밀면서 회전하는 모습을 볼 수 있습니다.
 
@@ -435,6 +441,7 @@ async def start(self):
     if self.make_block() == False:
         # game over
         self.b.b[self.b.b > 0] = 8
+        self.gameover = True
         self.display()
         return
     self.display()
@@ -458,7 +465,7 @@ async def start(self):
 
 ```python
 async def handle_keyboard_events(self):
-    while True:
+    while self.gameover == False:
         # 키보드 입력감지 함수를 다른 스레드에서 실행 
         event = await asyncio.to_thread(keyboard.read_event)
         
@@ -506,13 +513,15 @@ async def handle_keyboard_events(self):
 
 위 코드에서 강한 드랍이란 다음의 동작입니다.
 
-![harddrop](img/harddrop.webp)
+![harddrop](img/harddrop.gif)
 
 한편 위 함수들은 display 함수와 더불어 온라인 테트리스에서는 그대로 사용할 수 없는 코드입니다.
 
 이제 온라인 버전의 테트리스를 소개하겠습니다.
 
 ## Description of online tetris
+
+### 웹 폴더 구조
 
 웹 폴더의 구조는 다음과 같습니다.
 
@@ -521,25 +530,274 @@ async def handle_keyboard_events(self):
     - index.html
     - webgame.py
 
-
-display, start, handle_keyboard_events 메소드의 동작 방식이 웹 서버 환경에 적합하지 않기 때문에, 온라인 버전의 테트리스에서는 Game 클래스를 다음과 같은 객체로 상속하고 해당 메소드를 오버라이딩 해주었습니다.
-
-```python
-...
-class WebGame(Game):
-    async def display(self):
-        ...
-    async def start(self):
-        ...
-```
-
-해당 클래스는 webgame.py 파일 안에 있습니다.
-
 다음은 웹 서버 실행 코드입니다.
 
 ```cmd
 $ python web
 ```
 
-![online](img/online.webp)
+![online](img/online.gif)
 
+### main.py
+
+```python
+
+# socket 서버와 http 서버를 연결하는 코드
+...
+
+# http 연결
+@routes.get('/')
+async def index(request):
+    ...
+
+# websocket 연결
+@sio.on('connect')
+async def handle_connect(sid, data):
+    ...
+
+# 한 사람의 접속이 종료되면 연결 해제
+@sio.on('disconnect')
+async def handle_disconnect(sid):
+    ...
+
+# 클라이언트로부터 키보드 이벤트를 수신
+@sio.on('message')
+async def handle_message(sid, data):
+    ...
+    
+# 서버를 실행하는 코드
+app.add_routes(routes)
+if __name__ == '__main__':
+    web.run_app(app,host='0.0.0.0', port=8000)
+
+```
+
+index 함수는 사용자가 지정된 웹 주소에 접속하면 index.html 파일을 전송해주는 역할을 합니다.
+
+```python
+@sio.on('connect')
+async def handle_connect(sid, data):
+    global waiting_user, room_counter
+    print('cunnected:', sid)
+
+    # 이미 대기중인 사용자가 있는 경우
+    if waiting_user:
+        # 새로운 방(room)을 생성하고 두 사용자를 해당 room에 넣는다
+        await sio.emit('sid', sid, to=sid)
+        room = f'room_{room_counter}'
+        await sio.enter_room(room=room, sid=waiting_user)
+        await sio.enter_room(room=room, sid=sid)
+
+        # 이제 그 room에 대응하는 tetris 데이터 객체를 생성한다.
+        if room not in rooms_users:
+            rooms_users[room] = {}
+            rooms_users[room][waiting_user] = {'name': 'user1', 'data': WebGame(user='user1', socket=sio, room=room, rooms_users=rooms_users, sid=waiting_user)}
+            rooms_users[room][sid] = {'name': 'user2', 'data': WebGame(user='user2', socket=sio, room=room, rooms_users=rooms_users, sid=sid)}
+        await sio.emit('message', {'event': 'connected', 'data': 'A new user has joined the room.'}, to=room)
+
+        # 각자의 tetris를 멀티 쓰레드에서 동시에 실행한다
+        asyncio.create_task(rooms_users[room][waiting_user]['data'].start())
+        asyncio.create_task(rooms_users[room][sid]['data'].start())
+        waiting_user = None
+        room_counter += 1
+    
+    # 만약에 방이 존재하지 않는다면 새로운 사용자가 올 때 까지 대기시킨다.
+    else:
+        waiting_user = sid
+        await sio.emit('sid', sid, to=sid)
+```
+
+handle_connect 함수는 두 사용자를 연결하고 게임을 실행합니다. 
+1. 사용자가 웹에서 "match" 버튼을 누르면, 웹 소켓 연결이 실행됩니다.
+2. 서버는 해당 사용자에게 고유 id를 부여합니다.
+3. 만약에 이미 대기중이던 사람이 없다면, waiting_user에 id를 저장해두고 새로운 사용자가 접속할 때 까지 대기합니다.
+4. 만약 다른 사용자가 이미 대기중이라면, 방(room)을 개설하여 두 사용자를 room 안에 넣습니다.
+5. 해당 room에 대응하는 tetris 객체를 생성합니다.
+6. 각자의 tetris 게임을 비동기적으로 실행합니다.
+7. 연결이 완료되었음을 알리는 메세지를 전송합니다.
+
+```python
+
+@sio.on('message')
+async def handle_message(sid, data):
+    # 입력된 키
+    key = data['data']['key']
+    if key in WebGame.hotkeys:
+        # 유저가 속한 room 추출(유저 본인의 고유 room 제외)
+        rid = [room for room in sio.rooms(sid) if room != sid][0]
+        if rid:
+            room = rooms_users[rid]
+            user = room[sid]
+            g: WebGame = user['data']
+            if g.gameover:
+                return
+
+            # 키보드 이벤트 처리
+            flag = False
+            if key == 'ArrowRight':
+                flag = g.move('R')
+            elif key == 'ArrowLeft':
+                flag = g.move('L')
+            elif key == 'ArrowDown':
+                flag = g.move('D')
+            elif key == 'KeyZ':
+                flag = g.rotate(True)
+            elif key == 'KeyX':
+                flag = g.rotate()
+            elif key == 'KeyC':
+                flag = g.hold()
+            elif key == 'Space':
+                while g.move('D'):
+                    pass
+                g.droped = True
+                asyncio.create_task(g.start())
+                return
+            if flag:
+                await g.display()
+
+```
+
+hangle_message 함수는 사용자로부터 키보드 이벤트를 수신하여 블록의 움직임을 처리합니다. 각 버튼의 기능은 local 버전과 거의 같습니다. enter 버튼의 게임 중지 기능은 제외하였습니다.
+
+
+### webgame.py
+
+main.py 파일에서 handle_connect 함수는 Game 클래스의 start 메소드에 대응하고, hangle_message 함수는 Game 클래스의 handle_keyboard_events 메소드에 대응합니다. 이 두 메소드는 기존의 local tetris를 위한 코드이므로, 새로운 메소드로 오버라이딩 해 주어야 합니다.
+
+따라서 WebGame이라는 새로운 클래스를 만들고 이 객체에 Game 클래스를 상속하였습니다. 이렇게 하면 테트리스의 배열을 핸들링하는 주요 코드는 건드리지 않고 start, handle_keyboard_events, display 이 세 가지 메소드를 변경하는 것 만으로도 온라인 플레이를 지원할 수 있습니다.
+
+파일의 구조는 다음과 같습니다.
+
+```python
+class WebGame(Game):
+    score = 0
+
+    # init 함수에 웹 소켓과 관련된 변수들 추가
+    def __init__(self, user, socket: AsyncServer, room, rooms_users, sid):
+        super().__init__()
+        ...
+
+    # 사용자가 display 해야 할 데이터를 전송
+    async def display(self):
+        rid = [room for room in self.socket.rooms(self.sid) if room != self.sid][0]
+        if rid:
+            result = self.rooms_users[rid]
+            tmp = {}
+            for sid in result:
+                tmp[sid] = {'board': result[sid]['data'].b.b.tolist(), 
+                            'next_block': result[sid]['data'].next_t.b.tolist(),
+                            'hold_block': result[sid]['data'].hold_t.b.tolist() if result[sid]['data'].hold_t else None,
+                            'score': result[sid]['data'].score
+                            }
+            result = {'event': 'display', 'name': result[self.sid]['name'], 'data': tmp, 'sid': self.sid}
+            # 해당 룸의 데이터를 찾기(테트리스의 game 배열)
+            await self.socket.emit('message', result, room=rid)
+
+    # Game.start 함수에 대응, 큰 변경점 없음
+    async def start(self):
+        ...
+```
+
+Game.handle_keyboard_events 메소드의 기능들은 이미 main.py의 handle_message 함수로 구현하였으므로 새로 정의해줄 필요가 없었습니다.
+
+init과 display 함수에는 웹 소켓 연결을 위한 로직을 추가 해주었습니다.
+
+### index.html
+
+마지막으로 html 파일입니다.
+
+```html
+<head>
+    <!-- websocket 라이브러리 불러오기 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        /* css 스타일 */
+    </style>
+</head>
+<body>
+    ...
+    <!-- 매치 버튼을 누르면 웹 소켓 연결 -->
+    <div id="status" style="text-align:center;"><button onclick="matching()">match</button></div>
+    
+    <!-- 그래픽 인터페이스 -->
+    <div id="frame">
+        ...
+    </div>
+
+    <!-- javascript -->
+    <script>
+        const status = document.querySelector('#status');
+        function matching(e) {
+
+            // 웹 소켓 연결
+            const socket = io();
+            let sid = null
+
+            // 연결 된 경우, 고유 id를 받아오기
+            socket.on('sid', data => {
+                sid = data
+            });
+
+            // 서버로부터 메세지를 수신한 경우
+            // 1. 메세지의 종류가 'connected'라면, 연결 완료 메세지
+            // 2 'display' 라면, display 함수 실행
+            socket.on('message', function(data) {
+                switch (data.event) {
+                    case 'connected':
+                        // 연결 완료
+                        ...
+                    case 'display':
+
+                        // 고유 id를 이용해 player와 opponent 구분 하여 display 함수 각각 실행
+                        ...
+                }
+            });
+
+            // 사용자가 키보드를 누르면, 해당 이벤트 서버로 전송
+            window.addEventListener('keydown', e => {
+                ...
+            });
+
+            ...
+        }
+
+        
+        // local tetris의 display method와 로직이 거의 같음
+        function display(frame, boardData, nextData, holdData, scoreData) {
+            ...
+        }
+    </script>
+</body>
+```
+
+1. 사용자가 웹 주소로 접속하면, 다음과 같은 화면이 실행됩니다.
+![page](img/page.png)
+2. 위 이미지에서 match 버튼을 누르면, 다음과 같이 대기 상태가 됩니다.
+![matching](img/matching.png)
+3. 이때 또 다른 사용자가 접속하면, 다음과 같이 게임이 실행됩니다.
+![start](img/start.png)
+
+
+## Future Improvements
+
+
+기본적인 기능을 구현하는 것에 집중했기 때문에, 시중의 테트리스 게임의 기능 중에 구현하지 못한 부분과 향후 개선 사항이 있습니다.
+
+1. 게임이 서버에서 돌아간다는 점
+- 이 때문에 서버의 리소스를 많이 소모하고, 인터넷 속도에 따른 딜레이가 발생합니다.
+추후 자바스크립트를 이용하여 player의 게임 플레이는 로컬에서 직접 할 수 있도록 하고, 서버에서는 각자의 opponent의 객체만을 전송한다면, 더 매끄러운 게임 플레이가 가능할 것입니다.
+
+2. 시중의 테트리스 게임과 동떨어진 동작들
+- 이 프로젝트의 rotate 함수에서는 numpy의 매트릭스 회전 함수를 이용하였는데, 실제 테트리스 게임에서는 매트릭스를 회전시키는 것이 아니라 각도에 따른 배열이 전부 정의되어 있습니다. 예를 들면 회전 상태에 따라 O 블럭은 1개의 배열, I 블럭은 2개, 나머지 블럭은 4개의 배열이 정의되어 있습니다. 이 점 때문에 'T스핀'과 같은 기술을 사용할 수 있는데, 향후 회전 알고리즘을 개선한다면 그러한 복잡한 기술을 구현할 수 있을 것입니다.
+
+3. 게임이 종료된 이후의 동작이 없음
+- 이는 이번 프로젝트에서는 미처 구현하지 못했습니다. 매끄러운 게임 진행을 위해서 게임 종료, 재대결 등 사용자 인터페이스를 추가할 필요가 있습니다.
+
+## Conclusion
+
+웹 서버는 gcq 상에서 실시간으로 실행되고 있습니다.
+
+인터넷 탭을 두개 열어서 
+각각 [http://34.145.93.107:3000/] 이 주소에 접속하면 혼자서도 테트리스 게임을 해 볼 수 있습니다.
+
+이것으로 프로젝트에 대한 설명을 마치겠습니다.
